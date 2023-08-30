@@ -27,7 +27,7 @@ struct Circle
     int radius;
     SDL_Color color;
 
-    void move(int canvasWidth, int canvasHeight, std::vector<Circle> &circles)
+    void move(int canvasWidth, int canvasHeight, std::vector<Circle> &circles, std::vector<Particle> &particles)
     {
         x += dx;
         y += dy;
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            circle.move(canvasWidth, canvasHeight, circles);
+            circle.move(canvasWidth, canvasHeight, circles, particles);
         }
 
         for (auto &particle : particles)
