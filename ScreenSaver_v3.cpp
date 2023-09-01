@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <chrono>
+#include <omp.h>
 
 class Timer
 {
@@ -57,7 +58,6 @@ struct Circle
         {
             dy = -dy;
         }
-
         for (auto &other : circles)
         {
             float distance = sqrt(pow(x - other.x, 2) + pow(y - other.y, 2));
@@ -143,17 +143,26 @@ int main(int argc, char *argv[])
         }
     }
 
+
     SDL_Window *window = SDL_CreateWindow("Screensaver", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, canvasWidth, canvasHeight, SDL_WINDOW_SHOWN);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     std::vector<Circle> circles(N);
     std::vector<Particle> particles;
+
+    #pragma omp parallel for
     for (int i = 0; i < N; i++)
     {
-        circles[i] = Circle::randomCircle(canvasWidth, canvasHeight);
+        Circle circulo = Circle::randomCircle(canvasWidth, canvasHeight);
+
         if (specifiedRadius != -1)
         {
-            circles[i].radius = specifiedRadius;
+            circulo.radius = specifiedRadius;
+        }
+
+        #pragma omp critical
+        {
+            circles[i] = circulo;
         }
     }
 
@@ -180,15 +189,19 @@ int main(int argc, char *argv[])
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
 
+            // #pragma omp parallel for
             for (auto &circle : circles)
             {
                 SDL_SetRenderDrawColor(renderer, circle.color.r, circle.color.g, circle.color.b, circle.color.a);
+                // #pragma omp parallel for
                 for (int w = -circle.radius; w < circle.radius; w++)
                 {
+                    // #pragma omp parallel for
                     for (int h = -circle.radius; h < circle.radius; h++)
                     {
                         if (w * w + h * h <= circle.radius * circle.radius)
                         {
+                            // #pragma omp critical
                             SDL_RenderDrawPoint(renderer, circle.x + w, circle.y + h);
                         }
                     }
@@ -196,13 +209,17 @@ int main(int argc, char *argv[])
                 circle.move(canvasWidth, canvasHeight, circles, particles);
             }
 
+            #pragma omp parllale for
             for (auto &particle : particles)
             {
+                
                 SDL_SetRenderDrawColor(renderer, particle.color.r, particle.color.g, particle.color.b, 255);
                 SDL_RenderDrawPoint(renderer, particle.x, particle.y);
+                #pragma omp critical
                 particle.move();
             }
 
+            #pragma omp critical
             particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle &p)
                                            { return p.lifetime <= 0; }),
                             particles.end());
