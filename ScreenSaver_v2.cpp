@@ -4,6 +4,23 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
+#include <chrono>
+
+class Timer
+{
+public:
+    Timer(const std::string &name) : name(name), start(std::chrono::high_resolution_clock::now()) {}
+    ~Timer()
+    {
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        std::cout << "Tiempo tomado por " << name << ": " << duration.count() << " microsegundos" << std::endl;
+    }
+
+private:
+    std::string name;
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+};
 
 struct Particle
 {
@@ -43,10 +60,19 @@ struct Circle
 
         for (auto &other : circles)
         {
-            if (&other != this && sqrt(pow(x - other.x, 2) + pow(y - other.y, 2)) <= (radius + other.radius))
+            float distance = sqrt(pow(x - other.x, 2) + pow(y - other.y, 2));
+            if (&other != this && distance <= (radius + other.radius))
             {
                 dx = -dx;
                 dy = -dy;
+
+                // Mover los círculos fuera del área de colisión
+                float overlap = radius + other.radius - distance;
+                float angle = atan2(y - other.y, x - other.x);
+                x += overlap * cos(angle) / 2;
+                y += overlap * sin(angle) / 2;
+                other.x -= overlap * cos(angle) / 2;
+                other.y -= overlap * sin(angle) / 2;
 
                 const int numParticles = 30;
                 for (int i = 0; i < numParticles; i++)
@@ -80,16 +106,14 @@ struct Circle
     }
 };
 
-std::vector<Particle> particles;
-
 int main(int argc, char *argv[])
 {
     SDL_Init(SDL_INIT_VIDEO);
 
     const int canvasWidth = 640;
     const int canvasHeight = 480;
-    int N = 100;              // Cantidad predeterminada
-    int specifiedRadius = -1; // Radio no especificado
+    int N = 100;
+    int specifiedRadius = -1;
 
     if (argc > 1)
     {
@@ -104,6 +128,7 @@ int main(int argc, char *argv[])
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     std::vector<Circle> circles(N);
+    std::vector<Particle> particles;
     for (int i = 0; i < N; i++)
     {
         circles[i] = Circle::randomCircle(canvasWidth, canvasHeight);
@@ -128,35 +153,41 @@ int main(int argc, char *argv[])
             }
         }
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
+        auto start = std::chrono::high_resolution_clock::now();
 
-        for (auto &circle : circles)
-        {
-            SDL_SetRenderDrawColor(renderer, circle.color.r, circle.color.g, circle.color.b, circle.color.a);
-            for (int w = -circle.radius; w < circle.radius; w++)
+        { // Bloque para Timer
+            Timer timer("Bloque de Círculos y Partículas");
+
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderClear(renderer);
+
+            for (auto &circle : circles)
             {
-                for (int h = -circle.radius; h < circle.radius; h++)
+                SDL_SetRenderDrawColor(renderer, circle.color.r, circle.color.g, circle.color.b, circle.color.a);
+                for (int w = -circle.radius; w < circle.radius; w++)
                 {
-                    if (w * w + h * h <= circle.radius * circle.radius)
+                    for (int h = -circle.radius; h < circle.radius; h++)
                     {
-                        SDL_RenderDrawPoint(renderer, circle.x + w, circle.y + h);
+                        if (w * w + h * h <= circle.radius * circle.radius)
+                        {
+                            SDL_RenderDrawPoint(renderer, circle.x + w, circle.y + h);
+                        }
                     }
                 }
+                circle.move(canvasWidth, canvasHeight, circles, particles);
             }
-            circle.move(canvasWidth, canvasHeight, circles, particles);
-        }
 
-        for (auto &particle : particles)
-        {
-            SDL_SetRenderDrawColor(renderer, particle.color.r, particle.color.g, particle.color.b, 255);
-            SDL_RenderDrawPoint(renderer, particle.x, particle.y);
-            particle.move();
-        }
+            for (auto &particle : particles)
+            {
+                SDL_SetRenderDrawColor(renderer, particle.color.r, particle.color.g, particle.color.b, 255);
+                SDL_RenderDrawPoint(renderer, particle.x, particle.y);
+                particle.move();
+            }
 
-        particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle &p)
-                                       { return p.lifetime <= 0; }),
-                        particles.end());
+            particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle &p)
+                                           { return p.lifetime <= 0; }),
+                            particles.end());
+        }
 
         SDL_RenderPresent(renderer);
 
@@ -168,8 +199,6 @@ int main(int argc, char *argv[])
             frameCount = 0;
             startTime += 1000;
         }
-
-        SDL_Delay(1000 / 60); // Para mantener alrededor de 60 FPS
     }
 
     SDL_DestroyRenderer(renderer);
