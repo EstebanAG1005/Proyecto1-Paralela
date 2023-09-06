@@ -220,6 +220,10 @@ int main(int argc, char *argv[])
                 }
                 circle.move(canvasWidth, canvasHeight, circles, particles);
             }
+            auto stopCircles = std::chrono::high_resolution_clock::now();
+            auto durationCircles = std::chrono::duration_cast<std::chrono::microseconds>(stopCircles - startCircles);
+            totalTimeCircles += durationCircles.count();
+            iterationsCircles++;
         }
 
         {
@@ -240,6 +244,10 @@ int main(int argc, char *argv[])
             particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle &p)
                                            { return p.lifetime <= 0; }),
                             particles.end());
+            auto stopParticles = std::chrono::high_resolution_clock::now();
+            auto durationParticles = std::chrono::duration_cast<std::chrono::microseconds>(stopParticles - startParticles);
+            totalTimeParticles += durationParticles.count();
+            iterationsParticles++;
         }
 
         SDL_RenderPresent(renderer);
@@ -252,6 +260,15 @@ int main(int argc, char *argv[])
             frameCount = 0;
             startTime += 1000;
         }
+    }
+
+    if (iterationsCircles > 0)
+    {
+        std::cout << "Tiempo promedio para círculos: " << totalTimeCircles / iterationsCircles << " microsegundos" << std::endl;
+    }
+    if (iterationsParticles > 0)
+    {
+        std::cout << "Tiempo promedio para partículas: " << totalTimeParticles / iterationsParticles << " microsegundos" << std::endl;
     }
 
     SDL_DestroyRenderer(renderer);
