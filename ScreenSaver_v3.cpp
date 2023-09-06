@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
             Timer timer("Bloque de Partículas");
             auto startParticles = std::chrono::high_resolution_clock::now();
 
-#pragma omp parllale for
+#pragma omp parallale for
             for (auto &particle : particles)
             {
 
