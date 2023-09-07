@@ -7,6 +7,7 @@
 #include <chrono>
 #include <omp.h>
 
+// Definición de clase Timer para medir el tiempo
 class Timer
 {
 public:
@@ -23,6 +24,7 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
 };
 
+// Definición de la estructura Particle
 struct Particle
 {
     float x, y;
@@ -30,6 +32,7 @@ struct Particle
     int lifetime;
     SDL_Color color;
 
+    // Método para mover la partícula
     void move()
     {
         x += dx;
@@ -38,6 +41,7 @@ struct Particle
     }
 };
 
+// Definición de la estructura Circle
 struct Circle
 {
     float x, y;
@@ -45,6 +49,7 @@ struct Circle
     int radius;
     SDL_Color color;
 
+    // Método para mover el círculo y gestionar colisiones
     void move(int canvasWidth, int canvasHeight, std::vector<Circle> &circles, std::vector<Particle> &particles)
     {
         x += dx;
@@ -92,7 +97,7 @@ struct Circle
             }
         }
     }
-
+    // Método estático para generar un círculo aleatorio
     static Circle randomCircle(int canvasWidth, int canvasHeight)
     {
         Circle c;
@@ -108,6 +113,7 @@ struct Circle
 
 int main(int argc, char *argv[])
 {
+    // Inicializar SDL para vídeo
     SDL_Init(SDL_INIT_VIDEO);
 
     const int canvasWidth = 640;
@@ -115,6 +121,8 @@ int main(int argc, char *argv[])
     int N = 100;
     int specifiedRadius = -1;
 
+
+    // Procesar argumentos de línea de comando
     if (argc > 1)
     {
         try
@@ -149,13 +157,15 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-
+    // Crear ventana y renderer SDL
     SDL_Window *window = SDL_CreateWindow("Screensaver", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, canvasWidth, canvasHeight, SDL_WINDOW_SHOWN);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
+    // Crear vectores para círculos y partículas
     std::vector<Circle> circles(N);
     std::vector<Particle> particles;
 
+// Inicializar círculos con OpenMP
 #pragma omp parallel for
     for (int i = 0; i < N; i++)
     {
@@ -171,11 +181,12 @@ int main(int argc, char *argv[])
             circles[i] = circulo;
         }
     }
-
+    // Variables para el control del bucle principal
     bool isRunning = true;
     Uint32 startTime = SDL_GetTicks();
     Uint32 frameCount = 0;
 
+    // Variables para estadísticas de tiempo
     double totalTimeCircles = 0;
     int iterationsCircles = 0;
 
@@ -184,6 +195,7 @@ int main(int argc, char *argv[])
 
     while (isRunning)
     {
+        // Manejar eventos SDL
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
@@ -270,7 +282,7 @@ int main(int argc, char *argv[])
     {
         std::cout << "Tiempo promedio para partículas: " << totalTimeParticles / iterationsParticles << " microsegundos" << std::endl;
     }
-
+    // Limpieza
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
