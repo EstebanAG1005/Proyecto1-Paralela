@@ -48,7 +48,6 @@ struct Circle
     {
         x += dx;
         y += dy;
-
         if (x - radius <= 0 || x + radius >= canvasWidth)
         {
             dx = -dx;
@@ -65,15 +64,12 @@ struct Circle
             {
                 dx = -dx;
                 dy = -dy;
-
-                // Mover los círculos fuera del área de colisión
                 float overlap = radius + other.radius - distance;
                 float angle = atan2(y - other.y, x - other.x);
                 x += overlap * cos(angle) / 2;
                 y += overlap * sin(angle) / 2;
                 other.x -= overlap * cos(angle) / 2;
                 other.y -= overlap * sin(angle) / 2;
-
                 const int numParticles = 30;
                 for (int i = 0; i < numParticles; i++)
                 {
@@ -87,7 +83,6 @@ struct Circle
                     p.color = {Uint8(rand() % 256), Uint8(rand() % 256), Uint8(rand() % 256), 255};
                     particles.push_back(p);
                 }
-
                 break;
             }
         }
@@ -109,45 +104,24 @@ struct Circle
 int main(int argc, char *argv[])
 {
     SDL_Init(SDL_INIT_VIDEO);
-
     const int canvasWidth = 640;
     const int canvasHeight = 480;
     int N = 100;
     int specifiedRadius = -1;
-
     if (argc > 1)
     {
-        try{
-            N = std::stoi(argv[1]);
-            if (N <= 0) {
-                std::cerr << "Error: N debe ser un número positivo." << std::endl;
-                return 1;
-            }
-        } catch (const std::invalid_argument& e) {
-            std::cerr << "Error: El primer argumento no es un número válido." << std::endl;
-            return 1;
-        }
+        N = std::stoi(argv[1]);
     }
     if (argc > 2)
     {
-        try{
-           specifiedRadius = std::stoi(argv[2]);
-            if (specifiedRadius  <= 0) {
-                std::cerr << "Error: El segundo argumento debe ser un número positivo." << std::endl;
-                return 1;
-            }
-        }
-            catch (const std::invalid_argument& e) {
-            std::cerr << "Error: El segundo argumento no es un número válido." << std::endl;
-            return 1;
-        }
+        specifiedRadius = std::stoi(argv[2]);
     }
 
     SDL_Window *window = SDL_CreateWindow("Screensaver", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, canvasWidth, canvasHeight, SDL_WINDOW_SHOWN);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
     std::vector<Circle> circles(N);
     std::vector<Particle> particles;
+
     for (int i = 0; i < N; i++)
     {
         circles[i] = Circle::randomCircle(canvasWidth, canvasHeight);
@@ -161,6 +135,12 @@ int main(int argc, char *argv[])
     Uint32 startTime = SDL_GetTicks();
     Uint32 frameCount = 0;
 
+    double totalTimeCircles = 0;
+    int iterationsCircles = 0;
+
+    double totalTimeParticles = 0;
+    int iterationsParticles = 0;
+
     while (isRunning)
     {
         SDL_Event event;
@@ -172,13 +152,12 @@ int main(int argc, char *argv[])
             }
         }
 
-        auto start = std::chrono::high_resolution_clock::now();
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
 
-        { // Bloque para Timer
-            Timer timer("Bloque de Círculos y Partículas");
-
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            SDL_RenderClear(renderer);
+        {
+            Timer timer("Bloque de Círculos");
+            auto startCircles = std::chrono::high_resolution_clock::now();
 
             for (auto &circle : circles)
             {
@@ -196,28 +175,49 @@ int main(int argc, char *argv[])
                 circle.move(canvasWidth, canvasHeight, circles, particles);
             }
 
+            auto stopCircles = std::chrono::high_resolution_clock::now();
+            auto durationCircles = std::chrono::duration_cast<std::chrono::microseconds>(stopCircles - startCircles);
+            totalTimeCircles += durationCircles.count();
+            iterationsCircles++;
+        }
+
+        {
+            Timer timer("Bloque de Partículas");
+            auto startParticles = std::chrono::high_resolution_clock::now();
+
             for (auto &particle : particles)
             {
                 SDL_SetRenderDrawColor(renderer, particle.color.r, particle.color.g, particle.color.b, 255);
                 SDL_RenderDrawPoint(renderer, particle.x, particle.y);
                 particle.move();
             }
-
             particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle &p)
                                            { return p.lifetime <= 0; }),
                             particles.end());
+
+            auto stopParticles = std::chrono::high_resolution_clock::now();
+            auto durationParticles = std::chrono::duration_cast<std::chrono::microseconds>(stopParticles - startParticles);
+            totalTimeParticles += durationParticles.count();
+            iterationsParticles++;
         }
 
         SDL_RenderPresent(renderer);
 
         frameCount++;
-
-        if (SDL_GetTicks() - startTime >= 1000)
+        if (frameCount % 100 == 0)
         {
-            std::cout << "FPS: " << frameCount << std::endl;
-            frameCount = 0;
-            startTime += 1000;
+            Uint32 currentTicks = SDL_GetTicks();
+            std::cout << "FPS: " << 1000.0 * frameCount / (currentTicks - startTime) << std::endl;
         }
+    }
+
+    if (iterationsCircles > 0)
+    {
+        std::cout << "Tiempo promedio para círculos: " << totalTimeCircles / iterationsCircles << " microsegundos" << std::endl;
+    }
+    if (iterationsParticles > 0)
+    {
+        std::cout << "Tiempo promedio para partículas: " << totalTimeParticles / iterationsParticles << " microsegundos" << std::endl;
     }
 
     SDL_DestroyRenderer(renderer);

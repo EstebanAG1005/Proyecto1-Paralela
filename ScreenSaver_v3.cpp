@@ -117,32 +117,38 @@ int main(int argc, char *argv[])
 
     if (argc > 1)
     {
-        try{
+        try
+        {
             N = std::stoi(argv[1]);
-            if (N <= 0) {
+            if (N <= 0)
+            {
                 std::cerr << "Error: N debe ser un número positivo." << std::endl;
                 return 1;
             }
-        } catch (const std::invalid_argument& e) {
+        }
+        catch (const std::invalid_argument &e)
+        {
             std::cerr << "Error: El primer argumento no es un número válido." << std::endl;
             return 1;
         }
     }
     if (argc > 2)
     {
-        try{
-           specifiedRadius = std::stoi(argv[2]);
-            if (specifiedRadius  <= 0) {
+        try
+        {
+            specifiedRadius = std::stoi(argv[2]);
+            if (specifiedRadius <= 0)
+            {
                 std::cerr << "Error: El segundo argumento debe ser un número positivo." << std::endl;
                 return 1;
             }
         }
-            catch (const std::invalid_argument& e) {
+        catch (const std::invalid_argument &e)
+        {
             std::cerr << "Error: El segundo argumento no es un número válido." << std::endl;
             return 1;
         }
     }
-
 
     SDL_Window *window = SDL_CreateWindow("Screensaver", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, canvasWidth, canvasHeight, SDL_WINDOW_SHOWN);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -150,7 +156,7 @@ int main(int argc, char *argv[])
     std::vector<Circle> circles(N);
     std::vector<Particle> particles;
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int i = 0; i < N; i++)
     {
         Circle circulo = Circle::randomCircle(canvasWidth, canvasHeight);
@@ -160,7 +166,7 @@ int main(int argc, char *argv[])
             circulo.radius = specifiedRadius;
         }
 
-        #pragma omp critical
+#pragma omp critical
         {
             circles[i] = circulo;
         }
@@ -169,6 +175,12 @@ int main(int argc, char *argv[])
     bool isRunning = true;
     Uint32 startTime = SDL_GetTicks();
     Uint32 frameCount = 0;
+
+    double totalTimeCircles = 0;
+    int iterationsCircles = 0;
+
+    double totalTimeParticles = 0;
+    int iterationsParticles = 0;
 
     while (isRunning)
     {
@@ -181,13 +193,13 @@ int main(int argc, char *argv[])
             }
         }
 
-        auto start = std::chrono::high_resolution_clock::now();
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
 
-        { // Bloque para Timer
-            Timer timer("Bloque de Círculos y Partículas");
+        {
 
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            SDL_RenderClear(renderer);
+            Timer timer("Bloque de Círculos");
+            auto startCircles = std::chrono::high_resolution_clock::now();
 
             // #pragma omp parallel for
             for (auto &circle : circles)
@@ -208,18 +220,23 @@ int main(int argc, char *argv[])
                 }
                 circle.move(canvasWidth, canvasHeight, circles, particles);
             }
+        }
 
-            #pragma omp parllale for
+        {
+            Timer timer("Bloque de Partículas");
+            auto startParticles = std::chrono::high_resolution_clock::now();
+
+#pragma omp parllale for
             for (auto &particle : particles)
             {
-                
+
                 SDL_SetRenderDrawColor(renderer, particle.color.r, particle.color.g, particle.color.b, 255);
                 SDL_RenderDrawPoint(renderer, particle.x, particle.y);
-                #pragma omp critical
+#pragma omp critical
                 particle.move();
             }
 
-            #pragma omp critical
+#pragma omp critical
             particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle &p)
                                            { return p.lifetime <= 0; }),
                             particles.end());
